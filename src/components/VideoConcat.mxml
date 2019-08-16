@@ -1,34 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		 xmlns:s="library://ns.adobe.com/flex/spark" 
-		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" left="10" top="10"
-		 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" left="10" top="10" bottom="10" right="10"
+		 creationComplete="vgroup1_creationCompleteHandler(event)" 
 		 >
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
+			import mx.events.FlexEvent;
 			
 			private var file:File;
 			private var files:Array;
-			private var index:int;
 
 			private var ffmpeg:File = new File('app:///bin/ffmpeg.exe');
 			
 			[Bindable]
-			public var data:ArrayCollection = new ArrayCollection(
-			[   
-				{value:"1080P : 1920 x 1080", data: {w: 1920, h: 1080}},
-				{value:"720P : 1080 x 720", data: {w: 1080, h: 720}},
-				{value:"480P : 720 x 480", data: {w: 720, h: 480}},
-				{value:"PAL : 720 x 576", data: {w: 720, h: 576}}
-			]);  
-			
+			public var data:ArrayCollection;
+			[Bindable]
+			public var prodData:ArrayCollection;
+
 			protected function button1_clickHandler(event:MouseEvent):void
 			{
-				// TODO Auto-generated method stub
 				file = new File();
-				file.browseForOpenMultiple('select videos!', [new FileFilter("Videos (*.mp4)", "*.mp4")]);
+				file.browseForOpenMultiple('select videos!', [new FileFilter("Videos (*.mp4,*.mov)", "*.mp4;*.mov")]);
 				file.addEventListener(FileListEvent.SELECT_MULTIPLE, selectHandler);
 			}
 			
@@ -36,7 +31,7 @@
 			{
 				this.files = event.files;
 				this.btn.enabled = false;
-				var queue:Array = createNativeInfoQueue([]);
+				var queue:Array = createNativeInfoQueue();
 				
 				var process:NativeProcess = new NativeProcess();
 				process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
@@ -64,81 +59,49 @@
 							process.removeEventListener(NativeProcessExitEvent.EXIT, arguments.callee);
 							execute(process, queue, callback);
 						});
+						trace('args ==> "' + NativeProcessStartupInfo(info).arguments.join('" "') + '"');
 						process.start(info);
 					}
 					
 				}
 			}
 			
-			private function createNativeInfoQueue(queue:Array):Array {
-				if (files.length === 0) {
-					return queue;
-				}
-				var f:File = files.pop();
-				index ++;
-
-				var str:String = 'ffmpeg' + '\n' +
-					'-i 5sec_640x480.mp4' + '\n' + 
-					'-i 5sec_1920x1080.mp4' + '\n' +
-					'-i 5sec_720x1280.mp4' + '\n' +
-					'-filter_complex "' + '\n' +  
-					'[0:v] scale=w=min(iw*480/ih\,640):h=min(480\,ih*640/iw), pad=w=640:h=480:x=(640-iw)/2:y=(480-ih)/2  [video0];' + '\n' + 
-					'[1:v] scale=w=min(iw*480/ih\,640):h=min(480\,ih*640/iw), pad=w=640:h=480:x=(640-iw)/2:y=(480-ih)/2  [video1];' + '\n' +
-					'[2:v] scale=w=min(iw*480/ih\,640):h=min(480\,ih*640/iw), pad=w=640:h=480:x=(640-iw)/2:y=(480-ih)/2  [video2];' + '\n' +
-					'[video0][video1][video2] concat=n=3:v=1 [v]' + '\n' +
-					'" -map "[v]" -an -c:v h264 -crf 18 -preset veryfast -f mp4 output.mp4';
-				
-				
-				var selectedData:* = this.comboBox.selectedItem.data;
-				var templatePath:String = File.applicationDirectory.nativePath + '/assets/video-template/';
-				
-				var startName:String = 'start-01';
-				var endName:String = 'end-01';
-				var startMp4Template:String = templatePath + startName + '.mp4';
-				var endMp4Template:String = templatePath + endName + '.mp4';
-				var scale:String = '-' + selectedData.w + 'x' + selectedData.h;
-				var startMp4:String = templatePath + startName + scale + '.mp4';
-				var endMp4:String = templatePath + endName + scale + '.mp4';
-				if (!new File(startMp4).exists) {
-					queue.push(this.createStandardVideoNativeInfo(selectedData, startMp4Template, startMp4));
+			private function createNativeInfoQueue():Array {
+				var queue:Array = [];
+				for (var i:int = 0; i < files.length; i ++) {
+					var f:File = files[i];
+							
+					var selectedData:* = this.comboBox.selectedItem.data;
+					
+					var startMp4Template:String = File.applicationDirectory.nativePath + '/' + productComboBox.selectedItem.start;
+					var endMp4Template:String = File.applicationDirectory.nativePath + '/' + productComboBox.selectedItem.end;
+					var scale:String = '-' + selectedData.w + 'x' + selectedData.h;
+					
+					var tempPath:String = f.parent.nativePath + '/' + f.name.replace('.' + f.extension, '') + scale + '-temp.mp4';
+					var outputPath:String = f.parent.nativePath + '/' + f.name.replace('.' + f.extension, '') + scale + '.mp4';
+					
+					queue.push(this.getConcatVideoNativeInfo(startMp4Template, f.nativePath, endMp4Template, selectedData, outputPath));
 				}
 				
-				if (!new File(endMp4).exists) {
-					queue.push(this.createStandardVideoNativeInfo(selectedData, endMp4Template, endMp4));					
-				}
-				
-				var tempPath:String = f.parent.nativePath + '/' + f.name.replace('.' + f.extension, '') + scale + '-temp.mp4';
-				var outputPath:String = f.parent.nativePath + '/' + f.name.replace('.' + f.extension, '') + scale + '.mp4';
-				queue.push(this.createStandardVideoNativeInfo(selectedData, f.nativePath, tempPath));
-				
-				queue.push(this.getConcatVideoNativeInfo(startMp4, tempPath, endMp4, selectedData, outputPath));
-				queue.push(function():void {
-					var deleteFile:File = new File(tempPath);
-					deleteFile.deleteFileAsync();
-				});
-				return createNativeInfoQueue(queue);
-			}
-			
-			private function createStandardVideoNativeInfo(data:Object, input:String, output:String):NativeProcessStartupInfo {
-				var w:int = data.w;
-				var h:int = data.h;
-				var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
-				nativeInfo.executable = ffmpeg;
-				nativeInfo.arguments = Vector.<String>([
-					'-y', '-i', input, '-vf', 'scale=' + w + ':' + h, output
-				]);
-				return nativeInfo;
+				return queue;
 			}
 			
 			private function getConcatVideoNativeInfo(startMp4:String, content:String, endMp4:String, data:Object, outputPath:String):NativeProcessStartupInfo {
 				var w:int = data.w;
 				var h:int = data.h;
+				var paramStr:String = '';
+				for (var i:int = 0; i < 3; i ++) {
+					// paramStr += '[' + i + ':v] scale=w=min(iw*' + h + '/ih\\, ' + w + '):h=min(' + h + '\\,ih*' + w + '/iw), pad=w=' + w + ':h=' + h + ':x=(' + w + '-iw)/2:y=(' + h + '-ih)/2,setdar=16/9  [video' + i + ']; ';
+					paramStr += '[' + i + ':v] scale=w=min(iw*' + h + '/ih\\, ' + w + '):h=min(' + h + '\\,ih*' + w + '/iw), pad=w=' + w + ':h=' + h + ':x=(' + w + '-iw)/2:y=(' + h + '-ih)/2,setsar=1/1  [video' + i + ']; ';
+				}
 				var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
 				nativeInfo.executable = ffmpeg;
 				nativeInfo.arguments = Vector.<String>(['-y', '-i', startMp4, 
 					'-i', content,
 					'-i', endMp4,
-					'-filter_complex', '[0:v] scale=w=min(iw*' + h + '/ih\\, ' + w + '):h=min(' + h + '\\,ih*' + w + '/iw), pad=w=' + w + ':h=' + h + ':x=(' + w + '-iw)/2:y=(' + h + '-ih)/2  [video0]; [1:v] scale=w=min(iw*' + h + '/ih\\,' + w + '):h=min(' + h + '\\,ih*' + w + '/iw), pad=w=' + w + ':h=' + h + ':x=(' + w + '-iw)/2:y=(' + h + '-ih)/2  [video1]; [2:v] scale=w=min(iw*' + h + '/ih\\,' + w + '):h=min(' + h + '\\,ih*' + w + '/iw), pad=w=' + w + ':h=' + h + ':x=(' + w + '-iw)/2:y=(' + h + '-ih)/2  [video2]; [video0][video1][video2] concat=n=3:v=1 [v]',
+					'-filter_complex', 
+					paramStr +
+					'[video0][video1][video2] concat=n=3:v=1 [v]',
 					'-map', '[v]', '-an', '-c:v', 'h264', '-crf', '18', '-preset', 'veryfast', '-f', 'mp4', outputPath
 				]);
 				return nativeInfo;
@@ -166,6 +129,20 @@
 			{
 				trace(event.toString());
 			}
+			
+			protected function vgroup1_creationCompleteHandler(event:FlexEvent):void
+			{
+				var urlLoader:URLLoader = new URLLoader(new URLRequest("conf/config.json"));	
+				urlLoader.addEventListener(Event.COMPLETE, function(e:Event):void {
+					// 赋值
+					var obj:Object = JSON.parse(urlLoader.data);
+					data = new ArrayCollection(obj.resolution);
+					
+					prodData = new ArrayCollection(obj['video-templates']);
+
+				});
+			}
+			
 		]]>
 	</fx:Script>
 	<fx:Declarations>
@@ -173,15 +150,15 @@
 	</fx:Declarations>
 	<s:HGroup verticalAlign="middle" horizontalAlign="center">
 		<s:Label text="视频输出尺寸" height="100%" verticalAlign="middle"/>
-		<mx:ComboBox id="comboBox" dataProvider="{data}" labelField="value">
-			
+		<mx:ComboBox id="comboBox" dataProvider="{data}" labelField="value" selectedIndex="1">
 		</mx:ComboBox>
-	</s:HGroup>
-	<s:HGroup>
-		<s:RadioButton groupName = "options" id = "option1" 
-					   label = "item #1" width="150" />
-		<s:RadioButton groupName = "options" id = "option2" 
-					   label = "item #2" width="150" />
+		<s:Spacer width="20"/>
+		<s:Label text="片头模板" height="100%" verticalAlign="middle"/>
+		<mx:ComboBox id="productComboBox" dataProvider="{prodData}" labelField="name" selectedIndex="1">
+		</mx:ComboBox>
+		<s:Spacer width="20"/>
+		<s:CheckBox label="开发者模式（输出所有日志）">
+		</s:CheckBox>
 	</s:HGroup>
 	<s:Button id="btn" label="选择视频" click="button1_clickHandler(event)"/>
 	<s:TextArea editable="false" width="100%" height="100%" id="textArea">
