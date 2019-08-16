@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		 creationComplete="windowedapplication1_creationCompleteHandler(event)"
+		 >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			private var file:File;
+			
+			private var files:Array;
+			private var currentFile:File;
+			private var index:int = 0;
+			protected function windowedapplication1_creationCompleteHandler(event:FlexEvent):void
+			{
+				// TODO Auto-generated method stub
+				this.btn.addEventListener(MouseEvent.CLICK, btnClick);
+			}
+			
+			protected function btnClick(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				file = new File();
+				file.browseForOpenMultiple('select images!', [new FileFilter("Images (*.jpg, *.jpeg, *.gif, *.png)", "*.jpg;*.jpeg;*.gif;*.png;")]);
+				file.addEventListener(FileListEvent.SELECT_MULTIPLE, selectHandler);
+			}
+			
+			protected function selectHandler(event:FileListEvent):void
+			{
+				this.files = event.files;
+				this.btn.enabled = false;
+				this.progress.visible = true;
+				index = 0;
+				startLoad();
+			}
+			
+			private function startLoad():void {
+				if (files.length === 0) {
+					this.btn.enabled = true;
+					this.progress.visible = false;
+					return;
+				}
+				var f:File = files.pop();
+				index ++;
+				this.progress.label = '正在转换第 ' + index +' 张，剩余 ' + files.length + '张.';
+				this.progress.setProgress(index, index + files.length);
+				var loader:Loader = new Loader();
+				currentFile = f;
+				loader.load(new URLRequest(f.nativePath));
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, loaded);
+			}
+			
+			
+			private function loaded(evt:Event):void {
+				var loaderInfo:LoaderInfo = evt.currentTarget as LoaderInfo;
+				var w:Number = loaderInfo.content.width;
+				var h:Number = loaderInfo.content.height;
+				var max:Number = Math.max(w, h);
+				// 生成宽高都为max的logo图片
+				var pngFile:String = max + 'x' + max + '.png';
+				var f:File = new File('app:///assets/' + pngFile);
+				if (f.exists) {
+					var outputPath:File = new File(currentFile.parent.nativePath + '/output');
+					if (!outputPath.isDirectory) {
+						outputPath.createDirectory();
+					}
+					trace('exist');
+					var process:NativeProcess = new NativeProcess();
+					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+					nativeInfo.executable = new File('app:///bin/ffmpeg.exe');
+					
+					var path:String = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('\\'));
+					nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + '[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] ', path + '/output/' +  currentFile.name]);
+					nativeInfo.workingDirectory = File.applicationDirectory;
+					trace('--->', nativeInfo.arguments.join(' '), File.applicationDirectory.nativePath);
+					process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
+					process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
+					process.addEventListener(NativeProcessExitEvent.EXIT, onExit);
+					process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
+					process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
+					process.start(nativeInfo);
+				} else {
+					var process:NativeProcess = new NativeProcess();
+					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+					nativeInfo.executable = new File('app:///bin/ffmpeg.exe');
+					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/logo.png', '-s', max + 'x' + max, File.applicationDirectory.nativePath + '/assets/' + max + 'x' + max + '.png']);
+					process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
+					process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
+					process.addEventListener(NativeProcessExitEvent.EXIT, onExit);
+					process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
+					process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
+					process.start(nativeInfo);
+					files.push(currentFile);
+				}
+			}
+			
+			public function onOutputData(event:ProgressEvent):void
+			{
+				var process:NativeProcess = event.currentTarget as NativeProcess;
+				trace("Got: ", process.standardOutput.readUTFBytes(process.standardOutput.bytesAvailable)); 
+			}
+			
+			public function onErrorData(event:ProgressEvent):void
+			{
+				var process:NativeProcess = event.currentTarget as NativeProcess;
+				trace("ERROR -", process.standardError.readUTFBytes(process.standardError.bytesAvailable)); 
+			}
+			
+			public function onExit(event:NativeProcessExitEvent):void
+			{
+				var process:NativeProcess = event.currentTarget as NativeProcess;
+				trace("Process exited with ", event.exitCode);
+				this.startLoad();
+			}
+			
+			public function onIOError(event:IOErrorEvent):void
+			{
+				trace(event.toString());
+			}
+			
+		]]>
+	</fx:Script>
+	<s:Button label="选择图片" id="btn" top="10" left="10"/>
+	<mx:ProgressBar fontSize="16" verticalCenter="0" horizontalCenter="0" width="90%" id="progress" visible="false" direction="right" mode="manual" >
+	</mx:ProgressBar>
+</s:Group>
