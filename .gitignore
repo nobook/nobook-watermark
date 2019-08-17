@@ -2,3 +2,4 @@ bin-debug
 src/test-data
 *.air
 *.rar
+/Watermark
