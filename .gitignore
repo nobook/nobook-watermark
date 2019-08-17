@@ -4,3 +4,4 @@ src/test-data
 *.rar
 /Watermark
 .DS_Store
+.vscode
