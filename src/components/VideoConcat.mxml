@@ -14,6 +14,7 @@
 			private var files:Array;
 
 			private var ffmpeg:File = new File('app:///bin/ffmpeg.exe');
+			private var index:int = 0;
 			
 			[Bindable]
 			public var data:ArrayCollection;
@@ -49,6 +50,7 @@
 					var info:* = queue.shift();
 					if (!info) {
 						callback();
+						index = 0;
 						return;
 					}
 					if (info is Function) {
@@ -57,9 +59,16 @@
 					} else {
 						process.addEventListener(NativeProcessExitEvent.EXIT, function(e:*):void {
 							process.removeEventListener(NativeProcessExitEvent.EXIT, arguments.callee);
+							appendText("==> 第" + index + "个视频转换完成\n\n", true);
 							execute(process, queue, callback);
 						});
 						trace('args ==> "' + NativeProcessStartupInfo(info).arguments.join('" "') + '"');
+						index ++;
+						appendText("==> 正在转换第" + index + "个视频", true);
+						if (queue.length) {
+							appendText("，还剩" + queue.length + "个", true);
+						}
+						appendText("\n", true);
 						process.start(info);
 					}
 					
@@ -110,13 +119,13 @@
 			public function onOutputData(event:ProgressEvent):void
 			{
 				var process:NativeProcess = event.currentTarget as NativeProcess;
-				textArea.appendText(process.standardOutput.readUTFBytes(process.standardOutput.bytesAvailable));
+				appendText(process.standardOutput.readUTFBytes(process.standardOutput.bytesAvailable));
 			}
 			
 			public function onErrorData(event:ProgressEvent):void
 			{
 				var process:NativeProcess = event.currentTarget as NativeProcess;
-				textArea.appendText(process.standardError.readUTFBytes(process.standardError.bytesAvailable));
+				appendText(process.standardError.readUTFBytes(process.standardError.bytesAvailable));
 			}
 			
 			public function onExit(event:NativeProcessExitEvent):void
@@ -143,6 +152,19 @@
 				});
 			}
 			
+			private function appendText(str:String, force:Boolean = false):void {
+				var ary:Array = str.split('\n');
+				if (devModeCheckBox.selected === true || force === true) {
+					textArea.appendText(str);	
+				} else {
+					ary.forEach(function(s:*, a:*, b:*):void {
+						if (/^frame=/.test(s)) {
+							textArea.appendText(s);	
+						}
+					});
+				}
+			}
+			
 		]]>
 	</fx:Script>
 	<fx:Declarations>
@@ -157,7 +179,7 @@
 		<mx:ComboBox id="productComboBox" dataProvider="{prodData}" labelField="name" selectedIndex="1">
 		</mx:ComboBox>
 		<s:Spacer width="20"/>
-		<s:CheckBox label="开发者模式（输出所有日志）">
+		<s:CheckBox label="开发者模式（输出所有日志）" id="devModeCheckBox">
 		</s:CheckBox>
 	</s:HGroup>
 	<s:Button id="btn" label="选择视频" click="button1_clickHandler(event)"/>
