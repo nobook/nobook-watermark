@@ -9,9 +9,13 @@ package com.nobook.utils
 		{
 		}
 		
-		public static function getFFmpeg():File {
+		public static function isWindows():Boolean {
 			var os:String = Capabilities.os; 
-			if (os.indexOf("Windows") !== -1) {
+			return os.indexOf("Windows") !== -1;
+		}
+		
+		public static function getFFmpeg():File {
+			if (isWindows()) {
 				return new File('app:///bin/ffmpeg.exe');
 			} else {
 				return new File('app:///bin/ffmpeg');
