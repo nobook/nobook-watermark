@@ -9,6 +9,8 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
+			import com.nobook.utils.FFmpegTool;
+			
 			import mx.events.FlexEvent;
 			
 			private var file:File;
@@ -72,7 +74,7 @@
 					trace('exist');
 					var process:NativeProcess = new NativeProcess();
 					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
-					nativeInfo.executable = new File('app:///bin/ffmpeg.exe');
+					nativeInfo.executable = FFmpegTool.getFFmpeg();
 					
 					var path:String = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('\\'));
 					nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + '[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] ', path + '/output/' +  currentFile.name]);

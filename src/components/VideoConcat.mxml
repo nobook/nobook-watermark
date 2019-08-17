@@ -6,6 +6,8 @@
 		 >
 	<fx:Script>
 		<![CDATA[
+			import com.nobook.utils.FFmpegTool;
+			
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			import mx.events.FlexEvent;
@@ -13,7 +15,7 @@
 			private var file:File;
 			private var files:Array;
 
-			private var ffmpeg:File = new File('app:///bin/ffmpeg.exe');
+			private var ffmpeg:File = FFmpegTool.getFFmpeg();
 			private var index:int = 0;
 			
 			[Bindable]
@@ -141,6 +143,9 @@
 			
 			protected function vgroup1_creationCompleteHandler(event:FlexEvent):void
 			{
+				var os:String = Capabilities.os; 
+				trace(os);
+
 				var urlLoader:URLLoader = new URLLoader(new URLRequest("conf/config.json"));	
 				urlLoader.addEventListener(Event.COMPLETE, function(e:Event):void {
 					// 赋值
