@@ -53,7 +53,11 @@
 				this.progress.setProgress(index, index + files.length);
 				var loader:Loader = new Loader();
 				currentFile = f;
-				loader.load(new URLRequest(f.nativePath));
+				if (FFmpegTool.isWindows()) {
+					loader.load(new URLRequest(f.nativePath));
+				} else {
+					loader.load(new URLRequest('file://' + f.nativePath));
+				}
 				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, loaded);
 			}
 			
@@ -71,12 +75,18 @@
 					if (!outputPath.isDirectory) {
 						outputPath.createDirectory();
 					}
-					trace('exist');
 					var process:NativeProcess = new NativeProcess();
 					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
 					nativeInfo.executable = FFmpegTool.getFFmpeg();
+
+					var path:String;
+
+					if (FFmpegTool.isWindows()) {
+						path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('\\'));
+					} else {
+						path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('/'));
+					}
 					
-					var path:String = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('\\'));
 					nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + '[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] ', path + '/output/' +  currentFile.name]);
 					nativeInfo.workingDirectory = File.applicationDirectory;
 					trace('--->', nativeInfo.arguments.join(' '), File.applicationDirectory.nativePath);
@@ -89,7 +99,7 @@
 				} else {
 					var process:NativeProcess = new NativeProcess();
 					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
-					nativeInfo.executable = new File('app:///bin/ffmpeg.exe');
+					nativeInfo.executable = FFmpegTool.getFFmpeg();
 					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/logo.png', '-s', max + 'x' + max, File.applicationDirectory.nativePath + '/assets/' + max + 'x' + max + '.png']);
 					process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
 					process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);

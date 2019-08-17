@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"output": "bin-debug/Watermark.swf",
+		"accessible": true,
+		"source-path": [
+			"src"
+		],
+		"library-path": [
+			"libs"
+		]
+	},
+	"files": [
+		"src/Watermark.mxml"
+	],
+	"application": "src/Watermark-app.xml",
+	"copySourcePathAssets": true,
+	"additionalOptions": "-locale en_US",
+	"airOptions": {
+		"output": "Watermark.air",
+		"signingOptions": {
+			"keystore": "Z:/cert/nobook.p12",
+			"storetype": "pkcs12"
+		}
+	},
+	"config": "air"
+}

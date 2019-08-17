@@ -3,3 +3,4 @@ src/test-data
 *.air
 *.rar
 /Watermark
+.DS_Store

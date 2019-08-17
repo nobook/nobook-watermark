@@ -14,8 +14,8 @@
 	"video-templates": [
 		{ 
 			"name": "NOBOOK产品片头和片尾", 
-			"start": "assets\\video-template\\start-01.mp4",
-			"end": "assets\\video-template\\end-01.mp4"
+			"start": "assets/video-template/start-01.mp4",
+			"end": "assets/video-template/end-01.mp4"
 		}
 	]
 }

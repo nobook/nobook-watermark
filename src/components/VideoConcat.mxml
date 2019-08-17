@@ -64,7 +64,6 @@
 							appendText("==> 第" + index + "个视频转换完成\n\n", true);
 							execute(process, queue, callback);
 						});
-						trace('args ==> "' + NativeProcessStartupInfo(info).arguments.join('" "') + '"');
 						index ++;
 						appendText("==> 正在转换第" + index + "个视频", true);
 						if (queue.length) {
