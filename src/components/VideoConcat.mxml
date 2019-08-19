@@ -110,9 +110,9 @@
 					'-i', content,
 					'-i', endMp4,
 					'-filter_complex', 
-					paramStr +
-					'[video0][video1][video2] concat=n=3:v=1 [v]',
-					'-map', '[v]', '-an', '-c:v', 'h264', '-crf', '18', '-preset', 'veryfast', '-f', 'mp4', outputPath
+					paramStr + ' [0:a] anull [audio0];[1:a] anull [audio1];[2:a] anull [audio2];' +
+					'[video0][audio0][video1][audio1][video2][audio2] concat=n=3:v=1:a=1 [v][a]',
+					'-map', '[v]', '-map', '[a]',  '-c:a', 'aac', '-an', '-c:v', 'h264', '-crf', '18', '-preset', 'veryfast', '-f', 'mp4', outputPath
 				]);
 				return nativeInfo;
 			}

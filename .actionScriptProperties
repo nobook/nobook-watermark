@@ -24,7 +24,7 @@
   <flashCatalyst validateFlashCatalystCompatibility="false"/>
   <buildTargets>
     <buildTarget buildTargetName="default" platformId="default">
-      <airSettings airCertificatePath="Z:/cert/nobook.p12" airTimestamp="false" anePathSet="true" version="1">
+      <airSettings airCertificatePath="Z:/cert/nobook-rsa-2048.p12" airTimestamp="false" anePathSet="true" version="1">
         <airExcludes>
           <pathEntry path="test-data"/>
         </airExcludes>
