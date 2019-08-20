@@ -14,6 +14,7 @@
 			import mx.events.FlexEvent;
 			
 			private var file:File;
+			private var process:NativeProcess;
 			
 			private var files:Array;
 			private var currentFile:File;
@@ -58,57 +59,90 @@
 				} else {
 					loader.load(new URLRequest('file://' + f.nativePath));
 				}
+				process = new NativeProcess();
+				process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
+				process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
+				process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
+				process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
+
 				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, loaded);
+			}
+
+			private function loaded(evt:Event) {
+				var ary:Array = createQueue(evt.currentTarget as LoaderInfo);
+
+				process.addEventListener(NativeProcessExitEvent.EXIT, function(e:NativeProcessExitEvent):void{
+					execute();
+				});
+
+				execute();
+				
+				function execute():void {
+					var data:NativeProcessStartupInfo = ary.pop();
+					if (data) {
+						process.start(data);
+					}
+				}
 			}
 			
 			
-			private function loaded(evt:Event):void {
-				var loaderInfo:LoaderInfo = evt.currentTarget as LoaderInfo;
+			private function createQueue(loaderInfo):Array {
+				var queue:Array = [];
 				var w:Number = loaderInfo.content.width;
 				var h:Number = loaderInfo.content.height;
 				var max:Number = Math.max(w, h);
+				var min:Number = Math.min(w, h);
 				// 生成宽高都为max的logo图片
 				var pngFile:String = max + 'x' + max + '.png';
 				var f:File = new File('app:///assets/' + pngFile);
-				if (f.exists) {
-					var outputPath:File = new File(currentFile.parent.nativePath + '/output');
-					if (!outputPath.isDirectory) {
-						outputPath.createDirectory();
-					}
-					var process:NativeProcess = new NativeProcess();
+
+				var qrCodePath:String = min + 'x' + min + '.png';
+				var qrCodeFile:File = new File('app:///assets/' + qrCodePath);
+
+				if (!f.exists) {
 					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
 					nativeInfo.executable = FFmpegTool.getFFmpeg();
-
-					var path:String;
-
-					if (FFmpegTool.isWindows()) {
-						path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('\\'));
-					} else {
-						path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('/'));
-					}
-					
-					nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + '[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] ', path + '/output/' +  currentFile.name]);
-					nativeInfo.workingDirectory = File.applicationDirectory;
-					trace('--->', nativeInfo.arguments.join(' '), File.applicationDirectory.nativePath);
-					process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
-					process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
-					process.addEventListener(NativeProcessExitEvent.EXIT, onExit);
-					process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
-					process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
-					process.start(nativeInfo);
-				} else {
-					var process:NativeProcess = new NativeProcess();
-					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
-					nativeInfo.executable = FFmpegTool.getFFmpeg();
-					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/logo.png', '-s', max + 'x' + max, File.applicationDirectory.nativePath + '/assets/' + max + 'x' + max + '.png']);
-					process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
-					process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
-					process.addEventListener(NativeProcessExitEvent.EXIT, onExit);
-					process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
-					process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
-					process.start(nativeInfo);
-					files.push(currentFile);
+					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/logo.png', '-s', max + 'x' + max
+					, File.applicationDirectory.nativePath + '/assets/' + max + 'x' + max + '.png']);
+					queue.push(nativeInfo);
 				}
+
+				if (!qrCodeFile.exists) {
+					nativeInfo = new NativeProcessStartupInfo();
+					nativeInfo.executable = FFmpegTool.getFFmpeg();
+					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/qrcode.jpeg', '-s', min + 'x' + min, 
+					, File.applicationDirectory.nativePath + '/assets/' + min + 'x' + min + '.png']);
+					queue.push(nativeInfo);
+				}
+
+				var outputPath:File = new File(currentFile.parent.nativePath + '/output');
+				if (!outputPath.isDirectory) {
+					outputPath.createDirectory();
+				}
+				var path:String;
+
+				if (FFmpegTool.isWindows()) {
+					path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('\\'));
+				} else {
+					path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('/'));
+				}
+				for (var i:int = 0; i < files.length; i ++) {
+					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+					nativeInfo.executable = FFmpegTool.getFFmpeg();
+					if (qrCode.selected) {
+						nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + 
+						'[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] '
+						, path + '/output/' +  currentFile.name]);
+					} else {
+						nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + 
+						'[1watermark];movie=assets/' + qrCodeFile + '[2watermark];[in][1watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10; [in][2watermark] overlay=main_w-300:main_h-300;[out]'
+						, '-y', path + '/output/' + currentFile.name]);
+					}
+					nativeInfo.workingDirectory = File.applicationDirectory;
+					queue.push(nativeInfo);
+				}
+
+				return queue;
 			}
 			
 			public function onOutputData(event:ProgressEvent):void
@@ -123,13 +157,6 @@
 				trace("ERROR -", process.standardError.readUTFBytes(process.standardError.bytesAvailable)); 
 			}
 			
-			public function onExit(event:NativeProcessExitEvent):void
-			{
-				var process:NativeProcess = event.currentTarget as NativeProcess;
-				trace("Process exited with ", event.exitCode);
-				this.startLoad();
-			}
-			
 			public function onIOError(event:IOErrorEvent):void
 			{
 				trace(event.toString());
@@ -137,7 +164,12 @@
 			
 		]]>
 	</fx:Script>
-	<s:Button label="选择图片" id="btn" top="10" left="10"/>
+	<s:HGroup top="10" left="10">
+		<s:Button label="选择图片" id="btn" top="10" left="10"/>
+		<s:Spacer width="30"/>
+		<s:CheckBox label="添加二维码" id="qrCode">
+		</s:CheckBox>
+	</s:HGroup>
 	<mx:ProgressBar fontSize="16" verticalCenter="0" horizontalCenter="0" width="90%" id="progress" visible="false" direction="right" mode="manual" >
 	</mx:ProgressBar>
 </s:Group>
