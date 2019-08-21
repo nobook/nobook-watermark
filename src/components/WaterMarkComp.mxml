@@ -112,7 +112,7 @@
 				if (!qrCodeFile.exists && qrCode.selected) {
 					nativeInfo = new NativeProcessStartupInfo();
 					nativeInfo.executable = FFmpegTool.getFFmpeg();
-					nativeInfo.arguments = Vector.<String>(['-y', '-i', File.applicationDirectory.nativePath + '/assets/qrcode.jpeg', '-s', min + 'x' + min
+					nativeInfo.arguments = Vector.<String>(['-y', '-i', File.applicationDirectory.nativePath + '/assets/qrcode.png', '-s', min + 'x' + min
 					, File.applicationDirectory.nativePath + '/assets/' + qrCodePath]);
 					queue.push(nativeInfo);
 				}
