@@ -19,6 +19,7 @@
 			private var files:Array;
 			private var currentFile:File;
 			private var index:int = 0;
+			private var loader:Loader;
 			protected function windowedapplication1_creationCompleteHandler(event:FlexEvent):void
 			{
 				// TODO Auto-generated method stub
@@ -39,6 +40,13 @@
 				this.btn.enabled = false;
 				this.progress.visible = true;
 				index = 0;
+
+				process = new NativeProcess();
+				process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
+				process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
+				process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
+				process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
+
 				startLoad();
 			}
 			
@@ -52,66 +60,60 @@
 				index ++;
 				this.progress.label = '正在转换第 ' + index +' 张，剩余 ' + files.length + '张.';
 				this.progress.setProgress(index, index + files.length);
-				var loader:Loader = new Loader();
+				loader = new Loader();
 				currentFile = f;
 				if (FFmpegTool.isWindows()) {
 					loader.load(new URLRequest(f.nativePath));
 				} else {
 					loader.load(new URLRequest('file://' + f.nativePath));
 				}
-				process = new NativeProcess();
-				process.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputData);
-				process.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
-				process.addEventListener(IOErrorEvent.STANDARD_OUTPUT_IO_ERROR, onIOError);
-				process.addEventListener(IOErrorEvent.STANDARD_ERROR_IO_ERROR, onIOError);
-
 				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, loaded);
 			}
 
-			private function loaded(evt:Event) {
+			private function loaded(evt:Event):void {
 				var ary:Array = createQueue(evt.currentTarget as LoaderInfo);
 
-				process.addEventListener(NativeProcessExitEvent.EXIT, function(e:NativeProcessExitEvent):void{
-					execute();
-				});
+				process.addEventListener(NativeProcessExitEvent.EXIT, execute);
 
 				execute();
 				
-				function execute():void {
+				function execute(e:* = null):void {
 					var data:NativeProcessStartupInfo = ary.pop();
 					if (data) {
 						process.start(data);
+					} else {
+						process.removeEventListener(NativeProcessExitEvent.EXIT, execute);
+						startLoad();
 					}
 				}
 			}
 			
-			
-			private function createQueue(loaderInfo):Array {
+			private function createQueue(loaderInfo:*):Array {
 				var queue:Array = [];
 				var w:Number = loaderInfo.content.width;
 				var h:Number = loaderInfo.content.height;
 				var max:Number = Math.max(w, h);
-				var min:Number = Math.min(w, h);
+				var min:Number = Math.round(Math.min(w, h) * 0.2);
 				// 生成宽高都为max的logo图片
 				var pngFile:String = max + 'x' + max + '.png';
 				var f:File = new File('app:///assets/' + pngFile);
 
-				var qrCodePath:String = min + 'x' + min + '.png';
+				var qrCodePath:String = 'qrcode-' + min + 'x' + min + '.png';
 				var qrCodeFile:File = new File('app:///assets/' + qrCodePath);
 
 				if (!f.exists) {
 					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
 					nativeInfo.executable = FFmpegTool.getFFmpeg();
-					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/logo.png', '-s', max + 'x' + max
+					nativeInfo.arguments = Vector.<String>(['-y', '-i', File.applicationDirectory.nativePath + '/assets/logo.png', '-s', max + 'x' + max
 					, File.applicationDirectory.nativePath + '/assets/' + max + 'x' + max + '.png']);
 					queue.push(nativeInfo);
 				}
 
-				if (!qrCodeFile.exists) {
+				if (!qrCodeFile.exists && qrCode.selected) {
 					nativeInfo = new NativeProcessStartupInfo();
 					nativeInfo.executable = FFmpegTool.getFFmpeg();
-					nativeInfo.arguments = Vector.<String>(['-i', File.applicationDirectory.nativePath + '/assets/qrcode.jpeg', '-s', min + 'x' + min, 
-					, File.applicationDirectory.nativePath + '/assets/' + min + 'x' + min + '.png']);
+					nativeInfo.arguments = Vector.<String>(['-y', '-i', File.applicationDirectory.nativePath + '/assets/qrcode.jpeg', '-s', min + 'x' + min
+					, File.applicationDirectory.nativePath + '/assets/' + qrCodePath]);
 					queue.push(nativeInfo);
 				}
 
@@ -126,21 +128,19 @@
 				} else {
 					path = currentFile.nativePath.substr(0, currentFile.nativePath.lastIndexOf('/'));
 				}
-				for (var i:int = 0; i < files.length; i ++) {
-					var nativeInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
-					nativeInfo.executable = FFmpegTool.getFFmpeg();
-					if (qrCode.selected) {
-						nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + 
-						'[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] '
-						, path + '/output/' +  currentFile.name]);
-					} else {
-						nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + 
-						'[1watermark];movie=assets/' + qrCodeFile + '[2watermark];[in][1watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10; [in][2watermark] overlay=main_w-300:main_h-300;[out]'
-						, '-y', path + '/output/' + currentFile.name]);
-					}
-					nativeInfo.workingDirectory = File.applicationDirectory;
-					queue.push(nativeInfo);
+				nativeInfo = new NativeProcessStartupInfo();
+				nativeInfo.executable = FFmpegTool.getFFmpeg();
+				if (!qrCode.selected) {
+					nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + 
+					'[watermark];[in][watermark] overlay=main_w-overlay_w-10:main_h-overlay_h-10[out] '
+					, path + '/output/' +  currentFile.name]);
+				} else {
+					nativeInfo.arguments = Vector.<String>(['-y', '-i', currentFile.nativePath, '-vf', 'movie=assets/' + pngFile + 
+					'[1watermark];movie=assets/' + qrCodePath + '[2watermark];[in][1watermark]overlay=main_w-overlay_w-10:main_h-overlay_h-10[int];[int][2watermark]overlay=main_w-' + min + ':main_h-' + min +'[out]'
+					, '-y', path + '/output/' + currentFile.name]);
 				}
+				nativeInfo.workingDirectory = File.applicationDirectory;
+				queue.push(nativeInfo);
 
 				return queue;
 			}
